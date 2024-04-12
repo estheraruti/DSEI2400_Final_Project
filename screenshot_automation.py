@@ -14,7 +14,7 @@ driver = webdriver.Chrome(options=chrome_options)
 driver.maximize_window()
 
 # Define the folder path to save the images
-SAVE_FOLDER = "C:\\Users\\esthe\\DataEngineering\\DSEI2400_Final_Project\\Web_Photos"
+SAVE_FOLDER = input("Enter the folder path to save the screenshots: ")
 
 search_engines = {"http://www.google.com/search?q=": "google",
                   "https://www.bing.com/search?q=": "bing",
