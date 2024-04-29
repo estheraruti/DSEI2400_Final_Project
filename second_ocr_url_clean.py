@@ -2,24 +2,30 @@ import cv2
 import pytesseract
 import os
 import re
-import third_creating_df
+import first_query_websearch
+from first_query_websearch import df
 
 # define function to extract text from image
-def image_text_extract(pic_folder, text_folder):
-    for pic_name in os.listdir(pic_folder):
-        image_path = os.path.join(pic_folder, pic_name)
-        image = cv2.imread(image_path)
+def image_text_extract(img_path, text_folder):
+        pic_name = df['query'].replace(' ', '_')
+        image = cv2.imread(img_path)
         text = pytesseract.image_to_string(image)
         txt_path = os.path.join(text_folder, os.path.splitext(pic_name)[0] + '.txt')
+
+        # append text file path to df
+        df['txt_paths'] = txt_path
         
+        # write contents to file
         with open(txt_path, 'w') as text_file:
             text_file.write(text)
+            
+        
 
 # define function to extract URLs from text
-def get_urls(text_folder):
+def get_urls(txt_path):
+
     url_dict = {}
-    for text_name in os.listdir(text_folder):
-        txt_path = os.path.join(text_folder, text_name)
+    for txt_path in df['txt_paths']:
         
         with open(txt_path, 'r') as text_file:
             file_contents = text_file.read()
@@ -32,40 +38,49 @@ def clean_urls(url_dict):
     for k, v in url_dict.items():
         for i, url in enumerate(v):
             v[i] = re.sub(r'^h[a-z]*:', 'https:', url)
-            v[i] = re.sub(r':/A\w\w\w\.', '://www.', url)
+            v[i] = re.sub(r':/A\w\w\w\.', 'https://www.', url)
 
 
 def main():
-    pic_folder = input("Enter folder name where pictures are stored: ")
+    global df 
+    print(df.head())
     text_folder = input("Enter folder name where text files will be stored: ")
     
-    if os.path.exists(pic_folder) and os.path.exists(text_folder):
+    if os.path.exists(text_folder):
+
+        for img_path in df['img_paths']:
         
-        # run function to extract text from image
-        print("------Extracting text from image...------")
-        image_text_extract(pic_folder, text_folder)
-        print("\nText successfully extracted from images.\n")
-        # list all text files in the folder
-        text_names = os.listdir(text_folder)
-        print(text_names)
+            # run function to extract text from image
+            image_text_extract(img_path, text_folder)
+            print("TEXT EXTRACTED")
 
-        # run function to extract URLs from text
-        print("\n------Extracting URLs from text...------")
-        url_dict = get_urls(text_folder)
-        print("\nURLs extracted.\n")
-        # viewing the dictionary
-        for key, value in url_dict.items():
-            print(key, value)
-            print("\n")
+           
+            # run function to extract URLs from text
+            url_dict = get_urls(text_folder)
+            print("URLS EXTRACTED")
+            
+            # viewing the dictionary
+            for key, value in url_dict.items():
+                print(key, value)
+                print("\n")
 
-        # run function to clean extracted URLs
-        print("\n------Cleaning extracted URLs...------")
-        clean_urls(url_dict)
-        print("\nURLs have been cleaned.\n")
-        # viewing them
-        for key, value in url_dict.items():
-            print(key, value)
-            print("\n")
+            # run function to clean extracted URLs
+            clean_urls(url_dict)
+        
+            # viewing them
+            for key, value in url_dict.items():
+                print(key, value)
+                print("\n")
+
+            # append clean urls to data frame
+            df['urls'] = url_dict.values()
+
+            # explode list of urls
+            df.explode('urls')
+
+            print(df.head())
+
+        
 
 
     else:

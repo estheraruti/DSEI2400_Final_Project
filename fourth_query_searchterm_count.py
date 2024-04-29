@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 import first_query_websearch
+from first_query_websearch import df
 import third_creating_df
 
 def term_counts(df, query):
