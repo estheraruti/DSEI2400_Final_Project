@@ -42,11 +42,11 @@ class MyWebBrowser():
         self.window.setLayout(self.layout)
         self.window.show()
 
-    def navigate(self, url):
-        if not url.startswith("http"):
-            url = "http://" + url
+    def navigate(self, term):
+        if not term.startswith("http"):
+            url = "http://www.google.com/search?q=" + term
             self.url_bar.setText(url)
-        self.browser.setUrl(QUrl(url))
+        self.browser.setUrl(QUrl(term))
 
 
 app = QApplication([])
