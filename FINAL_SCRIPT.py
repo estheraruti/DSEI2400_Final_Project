@@ -94,7 +94,7 @@ if query:
 
             # take a screenshot
             screenshot_name = query.replace(' ', '_') + "_" + engine + ".png"
-            save_path = os.path.join(SAVE_FOLDER, screenshot_name)
+            save_path = os.path.join(Pic_Folder, screenshot_name)
             driver.save_screenshot(save_path)
 
             # Create a DataFrame for the current query and engine
