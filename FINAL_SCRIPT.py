@@ -9,7 +9,7 @@ import pytesseract
 import os
 import re
 import mysql.connector
-from mysql.connector import Error
+from sqlalchemy import create_engine
 
 
 ############### CREATING DF + CONN TO MSQL DB ###############
@@ -61,7 +61,7 @@ SAVE_FOLDER = 'Web_Photos'
 os.makedirs(SAVE_FOLDER, exist_ok=True)
 
 # create the dataframe that everything will be stored in
-df = pd.DataFrame(columns = ['query', 'search_engine', 'img_paths', 'url', 'term_count'])
+df = pd.DataFrame(columns = ['query', 'search_engine', 'img_paths', 'txt_paths', 'url', 'term_count'])
 
 search_engines = {"http://www.google.com/search?q=": "google",
                   "https://www.bing.com/search?q=": "bing",
@@ -112,37 +112,41 @@ else:
 
 
 
+
 ############### OCR TEXT RECOGNITION, URL SCRAPING, URL CLEANING ###############
 
 # ask user to specify where text files will be stored
 text_folder = input("Enter folder name where text files will be stored: ")
 
 if os.path.exists(text_folder):
-    for image in df['img_paths']:
-        
-        pic_name = row['query'].replace(' ', '_')
-        img_path = row['img_paths']
+    for img_path in df['img_paths']:
+        pic_name = df['query'].replace(' ', '_')
 
         # extract text from image
         image = cv2.imread(img_path)
         text = pytesseract.image_to_string(image)
-        txt_path = os.path.join(text_folder, os.path.splitext(pic_name)[0] + '.txt')
+        txt_path = os.path.join(str(text_folder), str(pic_name.iloc[0]) + '.txt')
+
 
         # write contents to file
         with open(txt_path, 'w') as text_file:
             text_file.write(text)
 
         # append text file path to df
-        df.at[index, 'txt_paths'] = txt_path
+        df['txt_paths'] = txt_path
 
 
 
-    # extract URLs from text
+    url_lists = []
+
     for txt_path in df['txt_paths']:
         with open(txt_path, 'r') as text_file:
             file_contents = text_file.read()
             urls = re.findall(r'(www\.[^\s]+|https?://[^\s]+)', file_contents)
-            df['urls'] = urls
+            url_lists.append(urls)
+
+    # Assign the URL lists to the DataFrame column
+    df['urls'] = url_lists
     
 
     # clean URLs 
@@ -151,7 +155,7 @@ if os.path.exists(text_folder):
             v[i] = re.sub(r'^h[a-z]*:', 'https:', url)
             v[i] = re.sub(r':/A\w\w\w\.', 'https://www.', url)
 
-    df.explode('urls')
+    df = df.explode('urls')
 
     print("Successfully cleaned URLS and appended to df.")
     print(df.head())
@@ -160,13 +164,14 @@ else:
     print("Please provide valid folder names.")
 
 
+
 ############### ADDING QUERY SEARCH TERM COUNT ###############
 
 def count_term_occurrences(query, url):
     return sum(1 for word in query.split() if word in url)
 
 # Apply the function to each row
-df['term_count'] = df.apply(lambda row: count_term_occurrences(row['query'], row['url']), axis=1)
+df['term_count'] = df.apply(lambda row: count_term_occurrences(row['query'], row['urls']), axis=1)
 
 print("Successfully counted search terms in URL.")
 print(df)
@@ -174,7 +179,17 @@ print(df)
 
 ############### APPENDING THE DF TO THE SQL DB ###############
 
-df.to_sql(con = conn, if_exists='append', name='search')
+# Define the connection string
+connection_string = 'mysql+mysqlconnector://esther:Chopsticks7!@localhost/MY_CUSTOM_BOT'
+
+# Create a SQLAlchemy engine
+engine = create_engine(connection_string)
+
+# Append the DataFrame to the existing table in the database
+df.to_sql(name='search', con=engine, if_exists='replace', index=False)
+
+# Dispose the engine
+engine.dispose()
 
 sql_query = "SELECT * FROM MY_CUSTOM_BOT.search"
 sql_df = pd.read_sql(sql_query, conn)
