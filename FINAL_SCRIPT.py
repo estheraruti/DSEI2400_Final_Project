@@ -55,10 +55,11 @@ driver = webdriver.Chrome(options=chrome_options)
 driver.maximize_window()
 
 # Define the folder path to save the images
-SAVE_FOLDER = 'Web_Photos'
+Pic_Folder = 'Web_Photos'
 
 # Ensure the folder exists, create it if it doesn't
-os.makedirs(SAVE_FOLDER, exist_ok=True)
+if not os.path.exists(Pic_Folder):
+    os.makedirs(Pic_Folder, exist_ok=True)
 
 # create the dataframe that everything will be stored in
 df = pd.DataFrame(columns = ['query', 'search_engine', 'img_paths', 'txt_paths', 'url', 'term_count'])
@@ -115,17 +116,20 @@ else:
 
 ############### OCR TEXT RECOGNITION, URL SCRAPING, URL CLEANING ###############
 
-# ask user to specify where text files will be stored
-text_folder = input("Enter folder name where text files will be stored: ")
+Text_Folder = "Extracted_Text"
 
-if os.path.exists(text_folder):
+# Ensure the folder exists, create it if it doesn't
+if not os.path.exists(Text_Folder):
+    os.makedirs(Text_Folder, exist_ok=True)
+
+if os.path.exists(Text_Folder):
     for img_path in df['img_paths']:
         pic_name = df['query'].replace(' ', '_')
 
         # extract text from image
         image = cv2.imread(img_path)
         text = pytesseract.image_to_string(image)
-        txt_path = os.path.join(str(text_folder), str(pic_name.iloc[0]) + '.txt')
+        txt_path = os.path.join(str(Text_Folder), str(pic_name.iloc[0]) + '.txt')
 
 
         # write contents to file
