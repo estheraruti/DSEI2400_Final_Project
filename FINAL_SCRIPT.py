@@ -123,23 +123,23 @@ if not os.path.exists(Text_Folder):
     os.makedirs(Text_Folder, exist_ok=True)
 
 if os.path.exists(Text_Folder):
-    for img_path in df['img_paths']:
-        pic_name = df['query'].replace(' ', '_')
+    for idx, img_path in enumerate(df['img_paths']):
+        pic_name = df.at[idx, 'query'].replace(' ', '_')  # Construct unique file name
+        search_engine = df.at[idx, 'search_engine']  # Retrieve search engine from DataFrame
 
         # extract text from image
         image = cv2.imread(img_path)
         text = pytesseract.image_to_string(image)
-        txt_path = os.path.join(str(Text_Folder), str(pic_name.iloc[0]) + '.txt')
-
+        
+        # Create a unique text file name
+        txt_path = os.path.join(Text_Folder, f"{pic_name}_{search_engine}.txt")
 
         # write contents to file
         with open(txt_path, 'w') as text_file:
             text_file.write(text)
 
         # append text file path to df
-        df['txt_paths'] = txt_path
-
-
+        df.at[idx, 'txt_paths'] = txt_path
 
     url_lists = []
 
@@ -151,7 +151,6 @@ if os.path.exists(Text_Folder):
 
     # Assign the URL lists to the DataFrame column
     df['urls'] = url_lists
-    
 
     # clean URLs 
     for k, v in df['urls'].items():
@@ -161,7 +160,7 @@ if os.path.exists(Text_Folder):
 
     df = df.explode('urls')
 
-    print("Successfully cleaned URLS and appended to df.")
+    print("Successfully cleaned URLs and appended to df.")
     print(df.head())
 
 else:
