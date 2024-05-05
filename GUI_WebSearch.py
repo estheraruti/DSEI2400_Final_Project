@@ -82,11 +82,8 @@ class MyWebBrowser:
 
     def navigate(self):
         term = self.url_bar.text()
-        if not term.startswith("http"):
-            self.web_search(term)
-            self.extract_text_and_find_urls()
-        else:
-            self.browser.setUrl(QUrl(term))
+        self.web_search(term)
+        self.extract_text_and_find_urls()
 
     def apply_custom_css(self):
         # Custom CSS style to set the page background color to light yellow
@@ -104,10 +101,10 @@ class MyWebBrowser:
     def web_search(self, query):
         SAVE_FOLDER = 'Web_Photos'
         os.makedirs(SAVE_FOLDER, exist_ok=True)
-        search_engines = {"http://www.google.com/search?q=": "google",
-                          "https://www.bing.com/search?q=": "bing",
+        search_engines = {"http://www.google.com/search?q=": "google"}
+        ''',              "https://www.bing.com/search?q=": "bing",
                           "https://search.yahoo.com/search?p=": "yahoo",
-                          "https://duckduckgo.com/?q=": "duckduckgo"}
+                          "https://duckduckgo.com/?q=": "duckduckgo"       '''
 
         dfs = []  # List to store DataFrames for each iteration
 
@@ -141,12 +138,18 @@ class MyWebBrowser:
         self.df = pd.concat(dfs, ignore_index=True)
         print(self.df.head())
         
+    
+        
     def extract_text_and_find_urls(self):
         
         Text_Folder = "Extracted_Text"
         os.makedirs(Text_Folder, exist_ok=True)
 
         dfs = []  # List to temporarily store DataFrames for URLs
+        def count_term_occurrences(query, urls):
+            # Function to count occurrences of terms in URLs
+            return sum(1 for url in urls for word in query.split() if word in url)
+
         for idx, row in self.df.iterrows():
             img_path = row['img_paths']
             pic_name = row['query'].replace(' ', '_')  # Construct unique file name
@@ -175,15 +178,46 @@ class MyWebBrowser:
             for i, url in enumerate(row['urls']):
                 row['urls'][i] = re.sub(r'^h[a-z]*:', 'https:', url)
                 row['urls'][i] = re.sub(r':/A\w\w\w\.', 'https://www.', url)
-
+            # Calculate term occurrences using count_term_occurrences
+            term_count = count_term_occurrences(row['query'], row['urls'])
+            row['term_count'] = term_count  # Add term_count column to the row
+            row['urls'] = ', '.join(row['urls'])
             dfs.append(row)
+        import mysql.connector
+        from sqlalchemy import create_engine
+        user=input("Enter your MYSQL username")
+        password=input("Enter your MYSQL password")
+        conn = mysql.connector.connect(
+            host="localhost",
+            user=user,
+            password=password
+        )
+
+        # Prepare the cursor object
+        cursor = conn.cursor()
+
+        # Define the connection string
+        connection_string = 'mysql+mysqlconnector://'+user+':'+password+'@localhost/MY_CUSTOM_BOT'
+
+        # Create a SQLAlchemy engine
+        engine = create_engine(connection_string)
 
         # Update the main DataFrame
         self.df = pd.DataFrame(dfs)
-        print("Successfully cleaned URLs and appended to df.")
-        print(self.df.head())
+        print("Successfully counted search terms in URL.")
 
+        # Append the DataFrame to the existing table in the database
+        self.df.to_sql(name='search', con=engine, if_exists='replace', index=False)
 
+        # Dispose the engine
+        engine.dispose()
+
+        sql_query = "SELECT * FROM MY_CUSTOM_BOT.search"
+        self.sql_df = pd.read_sql(sql_query, conn)
+        print("Successfully appended the dataframe to MYSQL database")
+        print(self.sql_df.head())
+
+        
 # Initialize the application and the main window
 app = QApplication([])
 window = MyWebBrowser()
