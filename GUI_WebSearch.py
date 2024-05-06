@@ -8,6 +8,9 @@ import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+import cv2
+import pytesseract
+import re
 
 class MyWebBrowser:
     def __init__(self):
@@ -16,6 +19,7 @@ class MyWebBrowser:
 
         # Create a vertical layout
         self.layout = QVBoxLayout()
+        self.browser = QWebEngineView()
 
         # Create a label prompting the user to enter their search term
         self.search_prompt_label = QLabel("Enter your query below")
@@ -78,10 +82,8 @@ class MyWebBrowser:
 
     def navigate(self):
         term = self.url_bar.text()
-        if not term.startswith("http"):
-            self.web_search(term)
-        else:
-            self.browser.setUrl(QUrl(term))
+        self.web_search(term)
+        self.extract_text_and_find_urls()
 
     def apply_custom_css(self):
         # Custom CSS style to set the page background color to light yellow
@@ -99,7 +101,7 @@ class MyWebBrowser:
     def web_search(self, query):
         SAVE_FOLDER = 'Web_Photos'
         os.makedirs(SAVE_FOLDER, exist_ok=True)
-        search_engines = {"http://www.google.com/search?q=": "google",
+        search_engines = {"http://www.google.com/search?q=":"google",
                           "https://www.bing.com/search?q=": "bing",
                           "https://search.yahoo.com/search?p=": "yahoo",
                           "https://duckduckgo.com/?q=": "duckduckgo"}
@@ -133,9 +135,120 @@ class MyWebBrowser:
             dfs.append(new_df)
 
         # Concatenate all DataFrames in the list
-        df = pd.concat(dfs, ignore_index=True)
-        print(df.head())
+        self.df = pd.concat(dfs, ignore_index=True)
+        print(self.df.head())
+        
+    
+        
+    def extract_text_and_find_urls(self):
+        
+        Text_Folder = "Extracted_Text"
+        os.makedirs(Text_Folder, exist_ok=True)
 
+        dfs = []  # List to temporarily store DataFrames for URLs
+
+
+        for idx, img_path in enumerate(self.df['img_paths']):
+            
+            pic_name = self.df.at[idx, 'query'].replace(' ', '_')  # Construct unique file name
+            search_engine = self.df.at[idx, 'search_engine']  # Retrieve search engine from DataFrame
+
+            # extract text from image
+            image = cv2.imread(img_path)
+            text = pytesseract.image_to_string(image)
+
+            # Create a unique text file name
+            txt_path = os.path.join(Text_Folder, f"{pic_name}_{search_engine}.txt")
+
+            # write contents to file
+            with open(txt_path, 'w') as text_file:
+                text_file.write(text)
+
+            # Append the file path to df
+            self.df.at[idx, 'txt_paths'] = txt_path
+
+        print(self.df['txt_paths'])
+
+        url_lists = []
+
+        for txt_path in self.df['txt_paths']:
+            with open(txt_path, 'r') as text_file:
+                file_contents = text_file.read()
+                urls = re.findall(r'(www\.[^\s]+|https?://[^\s]+)', file_contents)
+                url_lists.append(urls)
+            
+        # assign the URL lists the the df column
+        self.df['urls'] = url_lists
+
+        # clean URLs 
+        for k, v in self.df['urls'].items():
+            for i, url in enumerate(v):
+                v[i] = re.sub(r'^h[a-z]*:', 'https:', url)
+                v[i] = re.sub(r':/A\w\w\w\.', 'https://www.', url)
+
+        self.df = self.df.explode('urls')
+        print(self.df.head())
+
+        # define function to count term occurrences in url
+        def count_term_occurrences(query, urls):
+            # Split the query into words
+            query_words = query.split()
+            
+            # Initialize a counter for occurrences
+            total_occurrences = 0
+            
+            # Loop over each URL
+            for url in urls:
+                # Loop over each word in the query
+                for word in query_words:
+                    # Check if the word is in the URL
+                    if word in url:
+                        total_occurrences += 1
+            
+            return total_occurrences
+ 
+
+        # Apply the function to each row
+        self.df['term_count'] = self.df.apply(lambda row: count_term_occurrences(row['query'], row['urls']), axis=1)  
+
+        print(self.df.head(30))
+
+'''
+        import mysql.connector
+        from sqlalchemy import create_engine
+        user=input("Enter your MYSQL username")
+        password=input("Enter your MYSQL password")
+        conn = mysql.connector.connect(
+            host="localhost",
+            user=user,
+            password=password
+        )
+
+        # Prepare the cursor object
+        cursor = conn.cursor()
+
+        # Define the connection string
+        connection_string = 'mysql+mysqlconnector://'+user+':'+password+'@localhost/MY_CUSTOM_BOT'
+
+        # Create a SQLAlchemy engine
+        engine = create_engine(connection_string)
+
+        # Update the main DataFrame
+        self.df = pd.DataFrame(dfs)
+        print("Successfully counted search terms in URL.")
+
+        # Append the DataFrame to the existing table in the database
+        self.df.to_sql(name='search', con=engine, if_exists='replace', index=False)
+
+        # Dispose the engine
+        engine.dispose()
+
+        sql_query = "SELECT * FROM MY_CUSTOM_BOT.search"
+        self.sql_df = pd.read_sql(sql_query, conn)
+        print("Successfully appended the dataframe to MYSQL database")
+        print(self.sql_df.head()) '''
+
+        
 # Initialize the application and the main window
 app = QApplication([])
 window = MyWebBrowser()
