@@ -137,76 +137,87 @@ class MyWebBrowser:
         # Concatenate all DataFrames in the list
         self.df = pd.concat(dfs, ignore_index=True)
         print(self.df.head())
-        
-    
-        
+
     def extract_text_and_find_urls(self):
-        
         Text_Folder = "Extracted_Text"
         os.makedirs(Text_Folder, exist_ok=True)
 
-        dfs = []  # List to temporarily store DataFrames for URLs
-        def count_term_occurrences(query, urls):
-            # Function to count occurrences of terms in URLs
-            return sum(1 for url in urls for word in query.split() if word in url)
+        # Function to count occurrences of terms in a URL
+        def count_term_occurrences(query, url):
+            # Count occurrences of each term in the URL
+            return sum(1 for word in query.split() if word in url)
+
+        # List to temporarily store DataFrames for each URL
+        dfs = []
 
         for idx, row in self.df.iterrows():
             img_path = row['img_paths']
-            pic_name = row['query'].replace(' ', '_')  # Construct unique file name
-            search_engine = row['search_engine']  # Retrieve search engine from DataFrame
+            pic_name = row['query'].replace(' ', '_')
+            search_engine = row['search_engine']
 
-            # extract text from image
+            # Extract text from image
             image = cv2.imread(img_path)
             text = pytesseract.image_to_string(image)
 
             # Create a unique text file name
             txt_path = os.path.join(Text_Folder, f"{pic_name}_{search_engine}.txt")
 
-            # write contents to file
+            # Write contents to file
             with open(txt_path, 'w') as text_file:
                 text_file.write(text)
 
             # Store text file path in DataFrame
             row['txt_paths'] = txt_path
 
+            # Extract URLs using regex
             with open(txt_path, 'r') as text_file:
                 file_contents = text_file.read()
                 urls = re.findall(r'(www\.[^\s]+|https?://[^\s]+)', file_contents)
-                row['urls'] = urls
 
-            # clean URLs
-            for i, url in enumerate(row['urls']):
-                row['urls'][i] = re.sub(r'^h[a-z]*:', 'https:', url)
-                row['urls'][i] = re.sub(r':/A\w\w\w\.', 'https://www.', url)
-            # Calculate term occurrences using count_term_occurrences
-            term_count = count_term_occurrences(row['query'], row['urls'])
-            row['term_count'] = term_count  # Add term_count column to the row
-            row['urls'] = ', '.join(row['urls'])
-            dfs.append(row)
+            # Clean and normalize URLs
+            for i, url in enumerate(urls):
+                urls[i] = re.sub(r'^h[a-z]*:', 'https:', url)
+                urls[i] = re.sub(r':/A\w\w\w\.', 'https://www.', url)
+
+            # Process each URL individually
+            for url in urls:
+                term_count = count_term_occurrences(row['query'], url)
+
+                # Create a new DataFrame for each URL
+                url_df = pd.DataFrame({
+                    'query': [row['query']],
+                    'search_engine': [row['search_engine']],
+                    'url': [url],
+                    'term_count': [term_count],
+                    'txt_paths': [row['txt_paths']]
+                })
+
+                # Append the DataFrame to the list of DataFrames
+                dfs.append(url_df)
+
+        # Concatenate all DataFrames
+        self.df = pd.concat(dfs, ignore_index=True)
+        print("Successfully counted search terms in each URL.")
+
+        # Save the DataFrame to the database (code remains unchanged)
         import mysql.connector
         from sqlalchemy import create_engine
-        user=input("Enter your MYSQL username")
-        password=input("Enter your MYSQL password")
+
+        user = input("Enter your MYSQL username")
+        password = input("Enter your MYSQL password")
         conn = mysql.connector.connect(
             host="localhost",
             user=user,
             password=password
         )
 
-        # Prepare the cursor object
-        cursor = conn.cursor()
-
         # Define the connection string
-        connection_string = 'mysql+mysqlconnector://'+user+':'+password+'@localhost/MY_CUSTOM_BOT'
+        connection_string = 'mysql+mysqlconnector://' + user + ':' + password + '@localhost/MY_CUSTOM_BOT'
 
         # Create a SQLAlchemy engine
         engine = create_engine(connection_string)
 
-        # Update the main DataFrame
-        self.df = pd.DataFrame(dfs)
-        print("Successfully counted search terms in URL.")
-
-        # Append the DataFrame to the existing table in the database
+        # Save the DataFrame to the database
         self.df.to_sql(name='search', con=engine, if_exists='replace', index=False)
 
         # Dispose the engine
@@ -214,10 +225,8 @@ class MyWebBrowser:
 
         sql_query = "SELECT * FROM MY_CUSTOM_BOT.search"
         self.sql_df = pd.read_sql(sql_query, conn)
-        print("Successfully appended the dataframe to MYSQL database")
+        print("Successfully appended the DataFrame to MYSQL database")
         print(self.sql_df.head())
-
-        
 # Initialize the application and the main window
 app = QApplication([])
 window = MyWebBrowser()
