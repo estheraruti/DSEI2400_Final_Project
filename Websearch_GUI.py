@@ -24,7 +24,7 @@ class MyWebBrowser:
         # Create a label prompting the user to enter their search term
         self.search_prompt_label = QLabel("Enter your query below")
         self.search_prompt_label.setMaximumHeight(20)  # Reduced height
-        self.search_prompt_label.setFont(QFont('Sans Serif', 14))  # Smaller font size
+        self.search_prompt_label.setFont(QFont('Arial', 14))  # Smaller font size
         self.layout.addWidget(self.search_prompt_label)
 
         # Create a horizontal layout for the URL bar and buttons
@@ -104,7 +104,9 @@ class MyWebBrowser:
         search_engines = {"http://www.google.com/search?q=": "google",
                           "https://www.bing.com/search?q=": "bing",
                           "https://search.yahoo.com/search?p=": "yahoo",
-                          "https://duckduckgo.com/?q=": "duckduckgo"}
+                          "https://duckduckgo.com/?q=": "duckduckgo",
+                          "https://search.aol.com/aol/search?q=": "aol",
+                         "https://www.ask.com/web?q=": "ask"}
 
         dfs = []  # List to store DataFrames for each iteration
 
