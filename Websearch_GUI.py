@@ -180,6 +180,7 @@ class MyWebBrowser:
             for i, url in enumerate(urls):
                 urls[i] = re.sub(r'^h[a-z]*:', 'https:', url)
                 urls[i] = re.sub(r':/A\w\w\w\.', 'https://www.', url)
+            urls = set(urls)
 
             # Process each URL individually
             for url in urls:
